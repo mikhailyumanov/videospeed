@@ -1,3 +1,5 @@
+window.AudioContext = window.AudioContext || window.webkitAudioContext;
+
 var regStrip = /^[\r\t\f\v ]+|[\r\t\f\v ]+$/gm;
 
 var tc = {
@@ -185,7 +187,14 @@ function defineVideoController() {
 
     this.div = this.initializeControls();
 
-    var mediaEventAction = function (event) {
+    var no_more = false;
+    var mediaEventAction = async function (event) {
+      if (no_more) {
+        return;
+      }
+
+      no_more = true;
+
       storedSpeed = tc.settings.speeds[event.target.currentSrc];
       if (!tc.settings.rememberSpeed) {
         if (!storedSpeed) {
@@ -212,7 +221,45 @@ function defineVideoController() {
       );
 
       var video = controller.parentElement.querySelector("video");
-      setSpeed(controller, video, storedSpeed);
+
+      // START MAKING FUN 
+      window.context = new AudioContext();
+      media_element = context.createMediaElementSource(video);
+      analyser = context.createAnalyser();
+      analyser.smoothingTimeConstant = 0.9;
+      analyser.fftSize = 256;
+      media_element.connect(analyser);
+      analyser.connect(context.destination);
+      
+
+
+      while (true) {
+//        console.log(video.buffered.length); //[0].sourceBuffer.buffered.length());
+        var array = new Uint8Array(analyser.fftSize);
+        analyser.getByteTimeDomainData(array);
+        
+        var max = 0;
+        for (i = 0; i < array.length; i++) {
+          max = Math.max(max, Math.abs(array[i] - 128));
+//          console.log(a);
+        }
+        console.log(max);
+
+        if (max < 2) {
+          setSpeed(controller, video, 3);
+        }
+        await new Promise(r => setTimeout(r, 100));
+        setSpeed(controller, video, 1);
+
+//        await new Promise(r => setTimeout(r, 50));
+//        setSpeed(controller, video, 16);
+//        await new Promise(r => setTimeout(r, 1000));
+//        setSpeed(controller, video, 1);
+      }
+
+
+      // (never) FINISH MAKING FUN
+
     };
 
     target.addEventListener(
