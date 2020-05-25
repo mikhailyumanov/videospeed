@@ -231,32 +231,31 @@ function defineVideoController() {
       media_element.connect(analyser);
       analyser.connect(context.destination);
       
-
-
+      const sleep_ms = 50;
+      const loudness_window_size = 20;
+      var loudness_window = Array(loudness_window_size);
+      var loudness_sample_idx = 0;
+      
       while (true) {
-//        console.log(video.buffered.length); //[0].sourceBuffer.buffered.length());
         var array = new Uint8Array(analyser.fftSize);
         analyser.getByteTimeDomainData(array);
         
-        var max = 0;
-        for (i = 0; i < array.length; i++) {
-          max = Math.max(max, Math.abs(array[i] - 128));
-//          console.log(a);
-        }
-        console.log(max);
-
-        if (max < 2) {
-          setSpeed(controller, video, 3);
-        }
-        await new Promise(r => setTimeout(r, 100));
-        setSpeed(controller, video, 1);
-
-//        await new Promise(r => setTimeout(r, 50));
-//        setSpeed(controller, video, 16);
-//        await new Promise(r => setTimeout(r, 1000));
-//        setSpeed(controller, video, 1);
+        var max = array.reduce(
+          (acc, x) => Math.max(acc, Math.abs(x - 128)),
+          0
+        );
+        loudness_window[loudness_sample_idx % loudness_window_size] = max;
+        var loudness_avg = loudness_window.reduce((acc, x) => acc + x, 0) / loudness_window_size;
+        
+        const adj_speed_silence_ratio = 7;
+        const adj_speed_max = 3;
+        const adj_speed_loudness_expected = 0.2;
+        var adj_speed = 1 + (adj_speed_max - 1) * adj_speed_silence_ratio * Math.max(adj_speed_loudness_expected - loudness_avg, 0);  // linear
+        
+        console.log(max, loudness_avg, adj_speed);
+        setSpeed(controller, video, adj_speed);
+        await new Promise(r => setTimeout(r, sleep_ms));
       }
-
 
       // (never) FINISH MAKING FUN
 
